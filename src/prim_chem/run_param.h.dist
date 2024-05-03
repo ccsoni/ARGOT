@@ -1,0 +1,64 @@
+
+#include <stdio.h>
+#include "cosmology.h"
+
+#ifndef __RUN_PARAM__
+#define __RUN_PARAM__
+
+#ifndef MODEL
+#define MODEL "lcdm_75_128_g2visc"
+#endif
+
+#define MAX_OUTPUT          (100)
+#define MAX_STEPS           (100000)
+
+#ifndef OPENMP_NUMBER_OF_THREADS
+#define OPENMP_NUMBER_OF_THREADS (4)
+#endif
+
+struct run_param {
+   int nstep; 
+   
+   double lunit; 
+   double munit; 
+   double tunit; 
+   double eunit; 
+   
+   double masstonh; 
+   double denstonh; 
+   double uenetok; 
+   
+   /* io_ver: 1 -- N-body data with equal-mass */ 
+   /* io_ver: 2 -- DM + GAS data with equal-mass each for DM and GAS */ 
+   int   io_ver; 
+   int   npart,ngas; 
+   int   npart_max, ngas_max; 
+   int   npart_total, ngas_total; 
+   int   npart_skirt, ngas_skirt; 
+   float tnow, anow, znow, hnow, astart; 
+   struct cosmology cosm; 
+   
+   float dtime_min; 
+   int   noutput,outflag; 
+   float zoutput[MAX_OUTPUT]; 
+   
+   unsigned long nintr; 
+   
+   //                      struct mpi_param mpi; 
+   //                      struct fftw_mpi_param fftw_mpi;
+
+   // float maxcpu; 
+    FILE *log_file, *profile_file, *process_file;
+};
+
+#define MAX_STEP_LVL (4)
+
+/* misc. macros */
+
+#define SQR(x)  ((x)*(x))
+#define CUBE(x) ((x)*(x)*(x))
+
+#define MAX(a,b) ((a)>(b) ? (a) : (b))
+#define MIN(a,b) ((a)<(b) ? (a) : (b))
+
+#endif /* __RUN_PARAM__ */

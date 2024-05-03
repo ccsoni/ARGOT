@@ -1,0 +1,156 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+#include "chemistry.h"
+#include "constants.h"
+#include "run_param.h"
+#include "sph.h"
+
+void step_heatcool(struct SPH_Particle*, 
+		   struct prim_chem*, 
+		   struct run_param*,
+		   float);
+int step_reaction(struct SPH_Particle*, 
+		  struct prim_chem*, 
+		  struct run_param*, 
+		  float);
+
+void step_reaction_and_heatcool(struct SPH_Particle *sph, struct prim_chem *chem,
+		   struct run_param *this_run, float dtime); 
+
+float ztotime(float, struct cosmology);
+float timetoz(float, struct cosmology);
+void update_now(struct run_param*);
+
+int main(int argc, char **argv) 
+{
+  struct run_param this_run;
+  struct SPH_Particle sph[1];
+  struct prim_chem chem[1];
+
+  float omega0, hubble, omegab;
+  double dens, dens0, nH, nHe, wmol, T, uene, eunit, convfact;
+  double heatcool;
+  float dtime;
+
+  int ierr, nrec, p;
+  double P0;
+
+  float anow3;
+
+  /*
+  this_run.cosm.omega0=1.0;
+  this_run.cosm.lambda0=0.0;
+  this_run.cosm.hubble=0.5;
+  this_run.cosm.omegab=0.1;
+  */
+
+  this_run.cosm.omega0=0.267;
+  this_run.cosm.lambda0=1.e0 - this_run.cosm.omega0;
+  this_run.cosm.hubble=0.71;
+  this_run.cosm.omegab=0.045;
+
+  this_run.ngas = 1;
+
+  omega0=this_run.cosm.omega0;
+  hubble=this_run.cosm.hubble;
+  omegab=this_run.cosm.omegab;
+
+  this_run.lunit = mpc;
+  //this_run.munit = 1.88e-29*hubble*hubble*pow(this_run.lunit,3.0)*8.0/3.0*PI;
+  this_run.munit = 2.81e11*sunmass*SQR(hubble);
+  this_run.tunit = 8.93e+17/(hubble*sqrt(omega0))*sqrt(3.e0*omega0/8.e0/PI);
+  this_run.eunit = SQR(this_run.lunit)/SQR(this_run.tunit);
+  convfact = this_run.tunit/this_run.eunit*CUBE(this_run.lunit)/this_run.munit;
+
+  this_run.znow = 15.0;
+  this_run.anow = 1.0/(1.0+this_run.znow);
+  this_run.tnow = ztotime(this_run.znow, this_run.cosm);
+  update_now(&this_run);
+  anow3 = CUBE(this_run.anow);
+
+  this_run.masstonh = this_run.munit*xhydrog/mproton;
+  this_run.denstonh = this_run.masstonh/CUBE(this_run.lunit);
+  this_run.uenetok  = GAMM1*mproton/kboltz*this_run.eunit;
+
+  chem[0].felec = 2.4e-4*0.05/(hubble*omegab);
+  chem[0].fHI   = 1.0-chem[0].felec;
+  chem[0].fHII  = chem[0].felec;
+
+  chem[0].fHeIII= 6.0e-12/(yhelium/4.0);
+  chem[0].fHeII = 6.0e-12/(yhelium/4.0);
+  chem[0].fHeI  = 1.0-chem[0].fHeII-chem[0].fHeIII;
+
+  chem[0].fHM   = 7.6e-21/xhydrog;
+  chem[0].fH2I  = 1.5e-6/xhydrog;
+  chem[0].fH2II = 7.6e-21/xhydrog;
+
+  chem[0].felec = chem[0].felec-chem[0].fHM+chem[0].fH2II+hefact*(chem[0].fHeII+2.0*chem[0].fHeIII);
+
+  sph[0].wmol = WMOL(chem[0]);
+
+  dens0= 178.0*rhoc*hubble*hubble*this_run.cosm.omegab;
+  //dens0= rhoc*hubble*hubble*this_run.cosm.omegab;
+  dens = dens0*pow((1.0+this_run.znow),3.0);
+  nH = dens*xhydrog/mproton;
+  nHe = nH*hefact;
+  sph[0].dens = nH/this_run.denstonh*anow3;
+
+
+  T=1.0e+3;
+  //T=1.0e+2;
+  sph[0].uene = T/(this_run.uenetok*sph[0].wmol);
+  sph[0].duene = 0.0;
+#ifdef __TWOTEMP__
+  sph[0].duvisc = 0.0;
+  sph[0].te_scaled=1.0;
+#endif
+
+  P0=dens*T;
+
+  dtime = 1.0e-4;
+
+  while(this_run.znow > 0.0) {
+
+    nrec=0;
+    //step_reaction(sph, chem, &this_run, dtime);
+    sph[0].duene = 0; 
+    //step_heatcool(sph, chem, &this_run, dtime);
+
+#ifdef __TWOTEMP__
+    step_twotemp(sph, chem, &this_run, dtime);
+#endif /* __TWOTEMP__ */
+    step_reaction_and_heatcool(sph, chem, &this_run, dtime); 
+
+    T=sph[0].uene*this_run.uenetok*sph[0].wmol;
+    dens = P0/T;
+    //dens = dens0*pow((1.0+this_run.znow),3.0);
+    nH = dens*xhydrog/mproton;
+    sph[0].dens = nH/this_run.denstonh*anow3;
+
+    sph[0].wmol = WMOL(chem[0]);
+    
+    this_run.tnow += dtime;
+    update_now(&this_run);
+    anow3 = CUBE(this_run.anow);
+
+#if 1
+#ifdef __TWOTEMP__
+    printf("%14.6e %14.6e %14.6e %14.6e %14.6e %14.6e %14.6e %14.6e %14.6e ", 
+	   this_run.znow, this_run.tnow, T*sph[0].te_scaled, nH, 
+	   chem[0].fHI,chem[0].fHII,chem[0].fHM,chem[0].fH2I,chem[0].fH2II);
+    printf("%14.6e %14.6e %14.6e %14.6e %14.6e %14.6e\n",
+	   chem[0].fHeI,chem[0].fHeII,chem[0].fHeIII,chem[0].felec,
+	   sph[0].wmol,sph[0].te_scaled);
+#else
+    printf("%14.6e %14.6e %14.6e %14.6e %14.6e %14.6e %14.6e %14.6e %14.6e ", 
+	   this_run.znow, this_run.tnow, T, nH, 
+	   chem[0].fHI, chem[0].fHII, chem[0].fHM, chem[0].fH2I, chem[0].fH2II);
+    printf("%14.6e %14.6e %14.6e %14.6e %14.6e\n",
+	   chem[0].fHeI, chem[0].fHeII, chem[0].fHeIII, chem[0].felec, sph[0].wmol);
+#endif
+#endif
+
+  }
+}
