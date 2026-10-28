@@ -15,7 +15,7 @@
 #endif
 
 #ifdef __DIFFUSE_RADIATION__
-#include "diffuse_photon.h"
+#include "diffuse_photon/diffuse_photon.h"
 #endif /* __DIFFUSE_RADIATION__ */
 
 #include <sys/time.h>
@@ -135,5 +135,3 @@ void merge_photoion_data(struct fluid_mesh*, struct cuda_mem_space*, struct cuda
 #endif
 
 #endif /* __ARGOT_PROTOTYPE__ */
-
-

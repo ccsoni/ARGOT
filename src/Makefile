@@ -240,7 +240,8 @@ ifeq ($(compiler), intel)
 NVCCFLAGS += -ccbin=$(CC) -allow-unsupported-compiler -Xcompiler '-O3 -xHost -fiopenmp -mcmodel=medium'
 endif
 ifeq ($(use_gpu), yes)
-CLIBS += -L$(CUDAROOT)/lib64 -lcudart  -lstdc++
+#CLIBS += -L$(CUDAROOT)/lib64 -lcudart  -lstdc++ -Wl,-rpath,$(CUDAROOT)/lib64
+CLIBS += -lcudart_static -ldl -lrt -lpthread -lstdc++
 endif
 
 #healpix
@@ -454,7 +455,7 @@ $(DIFFUSE_DIR)/libdiffuse_photon.a:
 	cd $(DIFFUSE_DIR)/ && $(MAKE) use_gpu="$(use_gpu)" compiler="$(compiler)" CC="$(CC)"  AR="$(AR)" CFLAGS="$(CFLAGS) $(CPPFLAGS)" HPIX="$(HPIX)" NVCC="$(NVCC)" NVCCFLAGS="$(NVCCFLAGS)" CLIBS="$(CLIBS)" SM="$(SM)"
 
 surf_view/surf_view:
-	cd surf_view/ && $(MAKE) surf_view CC="$(CC)" FC="$(FC)" CFLAGS="$(CFLAGS) $(CPPFLAGS) -I.. -I$(PGPLOT_INC)" CLIBS="$(PGPLOT_LIBS)" FFLAGS="$(FFLAGS)"
+	cd surf_view/ && $(MAKE) surf_view CC="$(CC)" CFLAGS="$(CFLAGS) $(CPPFLAGS) -I.. -Imatplotlib-c/lib" CLIBS="-Lmatplotlib-c/lib -lmplc"
 
 surf_view/profile_1D:
 	cd surf_view/ && $(MAKE) profile_1D CC="$(CC)" CFLAGS="$(CFLAGS) $(CPPFLAGS) -I.."
@@ -506,7 +507,7 @@ $(IC_OBJ):
 	$(CC) $(IC_INC) $(CFLAGS) $(CPPFLAGS) -c $*.c -o $*.o
 
 clean:
-	-rm -rf $(ALL_EXE) $(UTIL_EXE) $(TEST_EXE) *.o *.s
+	-rm -rf *.o *.s
 	-rm -rf test_IC/*.o  test_IC/*.~
 	cd surf_view/ && $(MAKE) clean
 	cd prim_chem/ && $(MAKE) clean
@@ -515,3 +516,7 @@ clean:
 
 distclean: clean
 	-rm -rf *~
+	-rm -rf $(ALL_EXE) $(UTIL_EXE) $(TEST_EXE)
+	cd surf_view/ && $(MAKE) distclean
+	cd prim_chem/ && $(MAKE) distclean
+	cd $(DIFFUSE_DIR)/ && $(MAKE) distclean

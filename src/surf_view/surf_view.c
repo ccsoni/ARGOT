@@ -11,19 +11,17 @@
 #include "fluid.h"
 #include "radiation.h"
 
-#include "cpgplot.h"
-
 #define MESH(ix,iy,iz) mesh[(iz)+NMESH_Z_LOCAL*((iy)+NMESH_Y_LOCAL*(ix))]
 
 void input_mesh_single(struct fluid_mesh*, struct run_param*, char*);
 void input_mesh_header(struct run_param*, char*);
-void view_map(float*, float*, float*, int, int, int, int, int, int, 
-	      float, float, char*, char*);
+void view_map(float*, float*, float*, int, int, int, int, int, int,
+              float, float, char*, char*, const char *);
 
-void compile_map_x(struct fluid_mesh *mesh, 
-		   float *map_frac, float *map_tmpr, float *map_dens,
-		   float *pos1, float *pos2, float slice_pos,
-		   struct run_param *this_run)
+void compile_map_x(struct fluid_mesh *mesh,
+                   float *map_frac, float *map_tmpr, float *map_dens,
+                   float *pos1, float *pos2, float slice_pos,
+                   struct run_param *this_run)
 {
   int ix, iy, iz;
   int jx, jy, jz;
@@ -51,10 +49,10 @@ void compile_map_x(struct fluid_mesh *mesh,
 #undef MAPDENS
 }
 
-void compile_map_y(struct fluid_mesh *mesh, 
-		   float *map_frac, float *map_tmpr, float *map_dens,
-		   float *pos1, float *pos2, float slice_pos,
-		   struct run_param *this_run)
+void compile_map_y(struct fluid_mesh *mesh,
+                   float *map_frac, float *map_tmpr, float *map_dens,
+                   float *pos1, float *pos2, float slice_pos,
+                   struct run_param *this_run)
 {
   int ix, iy, iz;
   int jx, jy, jz;
@@ -82,10 +80,10 @@ void compile_map_y(struct fluid_mesh *mesh,
 #undef MAPDENS
 }
 
-void compile_map_z(struct fluid_mesh *mesh, 
-		   float *map_frac, float *map_tmpr, float *map_dens,
-		   float *pos1, float *pos2, float slice_pos,
-		   struct run_param *this_run)
+void compile_map_z(struct fluid_mesh *mesh,
+                   float *map_frac, float *map_tmpr, float *map_dens,
+                   float *pos1, float *pos2, float slice_pos,
+                   struct run_param *this_run)
 {
   int ix, iy, iz;
   int jx, jy, jz;
@@ -128,7 +126,7 @@ float get_tick(float min, float max)
   }
 
   float tick;
-  
+
   if(eff > 5.0) {
     tick = sft;
   }else if(eff > 2.0) {
@@ -146,7 +144,7 @@ void get_minmax(float fmin, float fmax, float *vmin, float *vmax)
   float fave;
 
   bln = 0.5*(fmin+fmax);
-  
+
   if(fmin > bln && fmax > bln) {
     fmin = bln;
   }else if(fmin<bln && fmax<bln) {
@@ -156,12 +154,12 @@ void get_minmax(float fmin, float fmax, float *vmin, float *vmax)
   }
 
   float tick = get_tick(fmin, fmax);
-  
+
   int bln_bin = bln/tick;
   bln = bln_bin * tick;
 
   float list_max, list_min;
-  
+
   list_max = list_min = bln;
 
   if(fmax != bln) {
@@ -174,7 +172,7 @@ void get_minmax(float fmin, float fmax, float *vmin, float *vmax)
   if(fmin != bln) {
     for(int i=-1;i>=(fmin-bln)/tick-1;i--) {
       list_min = MIN(list_min, i*tick+bln);
-      list_max = MAX(list_max, i*tick+bln);      
+      list_max = MAX(list_max, i*tick+bln);
     }
   }
 
@@ -182,7 +180,7 @@ void get_minmax(float fmin, float fmax, float *vmin, float *vmax)
   *vmax = list_max;
 }
 
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
 
   static struct run_param this_run;
@@ -191,16 +189,18 @@ int main(int argc, char **argv)
   static struct radiation_src src[NSOURCE_MAX];
 
   static char filename[256];
+  static char frac_filename[256];
+  static char tmpr_filename[256];
 
   float slice_pos;
   float *map_frac, *map_tmpr, *map_dens, *pos1, *pos2;
 
   this_run.proc_file=stdout;
 
-  if(argc != 6) {
-    fprintf(stderr, 
-	    "Usage: %s <input prefix> <X|Y|Z> <slice position> <vmin> <vmax>\n",
-	    argv[0]);
+  if(argc != 4) {
+    fprintf(stderr,
+            "Usage: %s <input prefix> <X|Y|Z> <slice position>\n",
+            argv[0]);
     exit(EXIT_FAILURE);
   }
 
@@ -233,49 +233,49 @@ int main(int argc, char **argv)
   for(rank_x=0;rank_x<NNODE_X;rank_x++) {
     for(rank_y=0;rank_y<NNODE_Y;rank_y++) {
       for(rank_z=0;rank_z<NNODE_Z;rank_z++) {
-	FILE *fp;
-	
-	sprintf(filename, "%s_%03d_%03d_%03d", 
-		argv[1], rank_x, rank_y, rank_z);
+        FILE *fp;
 
-	fp = fopen(filename,"r");
-	input_mesh_header(&this_run, filename);
-	fclose(fp);
-	
-	if(strcmp(argv[2],"X") == 0 &&
-	   this_run.xmin_local < slice_pos &&
-	   this_run.xmax_local >= slice_pos ) {
+        sprintf(filename, "%s_%03d_%03d_%03d",
+                argv[1], rank_x, rank_y, rank_z);
 
-	  fp = fopen(filename,"r");
-	  input_mesh_single(mesh, &this_run, filename);
-	  fclose(fp);
-	  
-	  compile_map_x(mesh, map_frac, map_tmpr, map_dens, 
-			pos1, pos2, slice_pos, &this_run);
-	  
-	}else if(strcmp(argv[2],"Y") == 0 &&
-		 this_run.ymin_local < slice_pos &&
-		 this_run.ymax_local >= slice_pos) {
+        fp = fopen(filename,"r");
+        input_mesh_header(&this_run, filename);
+        fclose(fp);
 
-	  fp = fopen(filename,"r");
-	  input_mesh_single(mesh, &this_run, filename);
-	  fclose(fp);
+        if(strcmp(argv[2],"X") == 0 &&
+           this_run.xmin_local < slice_pos &&
+           this_run.xmax_local >= slice_pos ) {
 
-	  compile_map_y(mesh, map_frac, map_tmpr, map_dens, 
-			pos1, pos2, slice_pos, &this_run);
+          fp = fopen(filename,"r");
+          input_mesh_single(mesh, &this_run, filename);
+          fclose(fp);
 
-	}else if(strcmp(argv[2],"Z") == 0 &&
-		 this_run.zmin_local < slice_pos &&
-		 this_run.zmax_local >= slice_pos) {
-	  
-	  fp = fopen(filename,"r");
-	  input_mesh_single(mesh, &this_run, filename);
-	  fclose(fp);
+          compile_map_x(mesh, map_frac, map_tmpr, map_dens,
+                        pos1, pos2, slice_pos, &this_run);
 
-	  compile_map_z(mesh, map_frac, map_tmpr, map_dens, 
-			pos1, pos2, slice_pos, &this_run);
+        }else if(strcmp(argv[2],"Y") == 0 &&
+                 this_run.ymin_local < slice_pos &&
+                 this_run.ymax_local >= slice_pos) {
 
-	}
+          fp = fopen(filename,"r");
+          input_mesh_single(mesh, &this_run, filename);
+          fclose(fp);
+
+          compile_map_y(mesh, map_frac, map_tmpr, map_dens,
+                        pos1, pos2, slice_pos, &this_run);
+
+        }else if(strcmp(argv[2],"Z") == 0 &&
+                 this_run.zmin_local < slice_pos &&
+                 this_run.zmax_local >= slice_pos) {
+
+          fp = fopen(filename,"r");
+          input_mesh_single(mesh, &this_run, filename);
+          fclose(fp);
+
+          compile_map_z(mesh, map_frac, map_tmpr, map_dens,
+                        pos1, pos2, slice_pos, &this_run);
+
+        }
 
       }
     }
@@ -341,37 +341,37 @@ int main(int argc, char **argv)
   printf("# max value for number density : %14.6e \n", vmax_dens);
   printf("# min value for number density : %14.6e \n", vmin_dens);
 #endif
-  
+
+
+  sprintf(frac_filename, "%s_frac.pdf", argv[1]);
+  sprintf(tmpr_filename, "%s_tmpr.pdf", argv[1]);
+
 
   //  vmin = atof(argv[4]);
   //  vmax = atof(argv[5]);
 
-  pgplot_err = cpgopen("?");
-
   if(strcmp(argv[2],"X")==0) {
 
-    view_map(map_frac, pos1, pos2, NMESH_Y_TOTAL, NMESH_Z_TOTAL, 
-             1, NMESH_Y_TOTAL, 1, NMESH_Z_TOTAL, vmin_frac, vmax_frac, "Z", "Y");
-    view_map(map_tmpr, pos1, pos2, NMESH_Y_TOTAL, NMESH_Z_TOTAL, 
-             1, NMESH_Y_TOTAL, 1, NMESH_Z_TOTAL, vmin_tmpr, vmax_tmpr, "Z", "Y");
+    view_map(map_frac, pos1, pos2, NMESH_Y_TOTAL, NMESH_Z_TOTAL,
+             1, NMESH_Y_TOTAL, 1, NMESH_Z_TOTAL, vmin_frac, vmax_frac, "Z", "Y", frac_filename);
+    view_map(map_tmpr, pos1, pos2, NMESH_Y_TOTAL, NMESH_Z_TOTAL,
+             1, NMESH_Y_TOTAL, 1, NMESH_Z_TOTAL, vmin_tmpr, vmax_tmpr, "Z", "Y", tmpr_filename);
 
   }else if(strcmp(argv[2],"Y")==0) {
 
-    view_map(map_frac, pos1, pos2, NMESH_X_TOTAL, NMESH_Z_TOTAL, 
-             1, NMESH_X_TOTAL, 1, NMESH_Z_TOTAL, vmin_frac, vmax_frac, "Z", "X");
-    view_map(map_tmpr, pos1, pos2, NMESH_X_TOTAL, NMESH_Z_TOTAL, 
-             1, NMESH_X_TOTAL, 1, NMESH_Z_TOTAL, vmin_tmpr, vmax_tmpr, "Z", "X");
+    view_map(map_frac, pos1, pos2, NMESH_X_TOTAL, NMESH_Z_TOTAL,
+             1, NMESH_X_TOTAL, 1, NMESH_Z_TOTAL, vmin_frac, vmax_frac, "Z", "X", frac_filename);
+    view_map(map_tmpr, pos1, pos2, NMESH_X_TOTAL, NMESH_Z_TOTAL,
+             1, NMESH_X_TOTAL, 1, NMESH_Z_TOTAL, vmin_tmpr, vmax_tmpr, "Z", "X", tmpr_filename);
 
   }else if(strcmp(argv[2],"Z")==0) {
 
-    view_map(map_frac, pos1, pos2, NMESH_X_TOTAL, NMESH_Y_TOTAL, 
-             1, NMESH_X_TOTAL, 1, NMESH_Y_TOTAL, vmin_frac, vmax_frac, "Y", "X");
-    view_map(map_tmpr, pos1, pos2, NMESH_X_TOTAL, NMESH_Y_TOTAL, 
-             1, NMESH_X_TOTAL, 1, NMESH_Y_TOTAL, vmin_tmpr, vmax_tmpr, "Y", "X");
+    view_map(map_frac, pos1, pos2, NMESH_X_TOTAL, NMESH_Y_TOTAL,
+             1, NMESH_X_TOTAL, 1, NMESH_Y_TOTAL, vmin_frac, vmax_frac, "Y", "X", frac_filename);
+    view_map(map_tmpr, pos1, pos2, NMESH_X_TOTAL, NMESH_Y_TOTAL,
+             1, NMESH_X_TOTAL, 1, NMESH_Y_TOTAL, vmin_tmpr, vmax_tmpr, "Y", "X", tmpr_filename);
 
   }
-
-  cpgclos();
 
   free(pos1);
   free(pos2);

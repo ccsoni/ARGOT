@@ -13,13 +13,13 @@ extern "C" {
 #define NMESH_Z_TOTAL (64)
 #endif 
 
-#if 0
+#if 1
 #define NMESH_X_TOTAL (128)
 #define NMESH_Y_TOTAL (128)
 #define NMESH_Z_TOTAL (128)
 #endif
 
-#if 1
+#if 0
 #define NMESH_X_TOTAL (256)
 #define NMESH_Y_TOTAL (256)
 #define NMESH_Z_TOTAL (256)
