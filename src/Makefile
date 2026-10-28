@@ -1,8 +1,8 @@
 use_gpu_argot = yes
 use_gpu_art = yes
 
-compiler = gnu
-#compiler = intel
+#compiler = gnu
+compiler = intel
 radiation_transfer = yes
 photon_conserving = yes
 diffuse = yes
@@ -17,8 +17,9 @@ riemann=hllc
 
 #site = gorilla
 #site = ppx
-site = cosmos-g03
+#site = cosmos-g03
 #site = cygnus
+site = pegasus
 
 ifeq ($(diffuse), yes)
 ifeq ($(use_gpu_argot), yes)
@@ -26,6 +27,32 @@ ifneq ($(use_gpu_art), yes)
 $(error Not support "use_gpu_argot=yes" && "use_gpu_art=no".)
 endif
 endif
+endif
+
+# Pegasus
+ifeq ($(site), pegasus)
+# GPU Compute Capability
+# Hopper arch (H100)
+SM:=90
+
+ifeq ($(compiler), intel)
+CC=mpicc
+CFLAGS=-O3 -funroll-loops -std=c99 -xCORE-AVX512 -mcmodel=medium -fiopenmp -Iprim_chem
+AR=ar
+FFTW3_DIR = /work/RTRHD/kohji/depot/intel2025_openmpi/fftw-3.3.10
+HPIX_DIR = /work/RTRHD/kohji/depot/intel2025_openmpi/healpix-3.83
+endif
+
+ifeq ($(compiler), gnu)
+CC=mpicc
+CFLAGS=-O3 -ffast-math -funroll-loops -std=c99 -mcmodel=medium -fopenmp -Iprim_chem
+AR=ar
+FFTW3_DIR = /work/RTRHD/kohji/depot/gnu_openmpi/fftw-3.3.10
+HPIX_DIR = /work/RTRHD/kohji/depot/gnu_openmpi/healpix-3.83
+endif
+
+CUDAROOT=/system/apps/cuda/13.0.2
+
 endif
 
 # Cygnus
@@ -122,7 +149,7 @@ ifeq ($(diffuse), yes)
 CFLAGS += -Idiffuse_photon
 endif
 
-CLIBS=-Lprim_chem -lprim_chem 
+CLIBS=-Lprim_chem -lprim_chem
 
 #DIFFUSE_DIR=diffuse_photon.old
 DIFFUSE_DIR=diffuse_photon
@@ -154,7 +181,7 @@ endif
 endif
 
 # isolated boundary condition
-ifeq ($(isolated), yes)	
+ifeq ($(isolated), yes)
 CPPFLAGS += -D__ISOLATED__
 endif
 
@@ -163,7 +190,7 @@ ifeq ($(cosmological), yes)
 CPPFLAGS += -D__COSMOLOGICAL__
 endif
 
-# 2nd order time integration for fluid dynamics 
+# 2nd order time integration for fluid dynamics
 CPPFLAGS += -D__SECOND_ORDER_RUNGE_KUTTA__
 
 # PGPLOT
@@ -177,10 +204,10 @@ PLPLOT_VIEW_DIR=plplot_view
 
 
 # debug mode for assign_ray_segment()
-#CPPFLAGS += -D__ARGOT_ASSIGN_RAY_SEGMENT_DEBUG__ 
+#CPPFLAGS += -D__ARGOT_ASSIGN_RAY_SEGMENT_DEBUG__
 #CPPFLAGS += -DNDEBUG
 
-# profiling mode 
+# profiling mode
 CPPFLAGS += -D__ARGOT_PROFILE__
 
 # compiler flags for prim chem library.
@@ -210,7 +237,7 @@ ifeq ($(compiler), gnu)
 NVCCFLAGS += -Xcompiler '-mcmodel=medium -fPIC -O3'
 endif
 ifeq ($(compiler), intel)
-NVCCFLAGS += --compiler-bindir=mpiicc -Xcompiler '-O3 -xHost -qopenmp -mcmodel=medium'
+NVCCFLAGS += -ccbin=$(CC) -allow-unsupported-compiler -Xcompiler '-O3 -xHost -fiopenmp -mcmodel=medium'
 endif
 ifeq ($(use_gpu), yes)
 CLIBS += -L$(CUDAROOT)/lib64 -lcudart  -lstdc++
@@ -269,7 +296,7 @@ endif
 
 
 ifeq ($(IC_PREFIX), cmpproj_test3_IC)
-STEP_RADIATION_OBJ = step_radiation.o 
+STEP_RADIATION_OBJ = step_radiation.o
 else ifeq ($(IC_PREFIX),bonnor_ebert_side_ray_IC)
 STEP_RADIATION_OBJ = step_radiation.o
 else
@@ -323,7 +350,7 @@ ARGOT_MPI_OBJ = argot_mpi.o calc_ray_segment.o init_mpi.o cross_section.o \
 
 SETUP_IC_OBJ = $(IC_OBJ) output_data.o mpi_rank.o make_directory.o source.o
 
-CHECK_SOURCE_OBJ = check_source.o input_data.o 
+CHECK_SOURCE_OBJ = check_source.o input_data.o
 
 TEST_GRAV_OBJ = test_grav.o init_mpi.o input_data.o input_params.o \
 	init_run.o mpi_rank.o make_directory.o cross_section.o \
@@ -340,24 +367,24 @@ TEST_OPTICAL_DEPTH_OBJ = test_optical_depth.o init_mpi.o input_data.o	\
 	init_run.o calc_ray_segment.o calc_optical_depth.o mpi_rank.o	\
 	make_directory.o setup_light_ray_long.o assign_ray_segment.o	\
 	accum_optical_depth.o timing.o calc_photoion_rate.o		\
-	smooth_photoion_rate.o calc_timestep.o step_chemistry.o update_chemistry.o 
+	smooth_photoion_rate.o calc_timestep.o step_chemistry.o update_chemistry.o
 
 TEST_TREE_OBJ = test_tree.o input_data.o setup_light_ray_tree.o calc_ray_segment.o mpi_rank.o
 
-DIV_NODES_OBJ = divide_nodes.o make_directory.o 
+DIV_NODES_OBJ = divide_nodes.o make_directory.o
 
 ifeq ($(gravity), yes)
 ARGOT_HYDRO_MPI_OBJ += init_fftw_mpi.o init_green.o calc_grav_pot.o $(CALC_GRAVITY_TERM_OBJ)
 endif
 
-ifeq ($(use_gpu), yes) 
+ifeq ($(use_gpu), yes)
 ARGOT_HYDRO_MPI_OBJ += init_gpu.o send_mesh_data.o send_photoion_data.o recv_photoion_data.o \
 	chemistry.o recv_mesh_data.o allocate_pinned_segment.o send_run_param_data.o merge_photoion_data.o \
 	calc_photoion_rate_cuda.o calc_optical_depth_cuda.o
 ARGOT_MPI_OBJ += init_gpu.o send_mesh_data.o send_photoion_data.o recv_photoion_data.o \
 	chemistry.o recv_mesh_data.o allocate_pinned_segment.o send_run_param_data.o merge_photoion_data.o \
 	calc_photoion_rate_cuda.o calc_optical_depth_cuda.o
-TEST_OPTICAL_DEPTH_OBJ += init_gpu.o send_mesh_data.o send_photoion_data.o recv_photoion_data.o allocate_pinned_segment.o chemistry.o 
+TEST_OPTICAL_DEPTH_OBJ += init_gpu.o send_mesh_data.o send_photoion_data.o recv_photoion_data.o allocate_pinned_segment.o chemistry.o
 endif
 
 ifeq ($(cosmological), yes)
@@ -370,7 +397,7 @@ SETUP_IC_DEP := $(SETUP_IC_OBJ)
 CHECK_SOURCE_DEP := $(CHECK_SOURCE_OBJ)
 TEST_GRAV_DEP := $(TEST_GRAV_OBJ)
 TEST_CALC_RAY_SEGMENT_DEP := $(TEST_CALC_RAY_SEGMENT_OBJ)
-TEST_RAY_SEGMENT_COMM_DEP := $(TEST_REY_SEGMENT_COMM_OBJ) 
+TEST_RAY_SEGMENT_COMM_DEP := $(TEST_REY_SEGMENT_COMM_OBJ)
 TEST_OPTICAL_DEPTH_DEP := $(TEST_OPTICAL_DEPTH_OBJ)
 TEST_TREE_DEP := $(TEST_TREE_OBJ)
 DIV_NODES_DEP := $(DIV_NODES_OBJ)
@@ -395,7 +422,7 @@ argot_hydro_mpi: prim_chem/libprim_chem.a $(ARGOT_HYDRO_MPI_DEP)
 argot_mpi: prim_chem/libprim_chem.a $(ARGOT_MPI_DEP)
 	$(CC) $(CFLAGS) -o $@ $(ARGOT_MPI_OBJ) $(CLIBS) $(HPIX) -lm
 
-setup_IC: prim_chem/libprim_chem.a $(SETUP_IC_DEP) 
+setup_IC: prim_chem/libprim_chem.a $(SETUP_IC_DEP)
 	$(CC) $(CFLAGS) -o $@ $(SETUP_IC_OBJ) $(CLIBS) -lm
 
 check_source: $(CHECK_SOURCE_DEP)
@@ -416,14 +443,14 @@ test_optical_depth: $(TEST_OPTICAL_DEPTH_DEP)
 test_tree: $(TEST_TREE_DEP)
 	$(CC) $(CFLAGS) -o $@ $(TEST_TREE_OBJ) $(CLIBS) -lm
 
-prim_chem/libprim_chem.a: 
+prim_chem/libprim_chem.a:
 	cd $(PRIM_CHEM_DIR) && $(MAKE) CC="$(CC)" AR="$(AR)" CFLAGS="$(CFLAGS) $(CPPFLAGS)"
 
 divide_nodes: $(DIV_NODES_DEP)
-	$(CC) $(CFLAGS) -o $@ $(DIV_NODES_OBJ) 
+	$(CC) $(CFLAGS) -o $@ $(DIV_NODES_OBJ)
 
 
-$(DIFFUSE_DIR)/libdiffuse_photon.a: 
+$(DIFFUSE_DIR)/libdiffuse_photon.a:
 	cd $(DIFFUSE_DIR)/ && $(MAKE) use_gpu="$(use_gpu)" compiler="$(compiler)" CC="$(CC)"  AR="$(AR)" CFLAGS="$(CFLAGS) $(CPPFLAGS)" HPIX="$(HPIX)" NVCC="$(NVCC)" NVCCFLAGS="$(NVCCFLAGS)" CLIBS="$(CLIBS)" SM="$(SM)"
 
 surf_view/surf_view:
@@ -473,12 +500,12 @@ $(PLPLOT_VIEW_DIR)/profile_1D_line:
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $*.c -o $*.o
 
 .c.s:
-	$(CC) $(CFLAGS) $(CPPFLAGS) -S $*.c 
+	$(CC) $(CFLAGS) $(CPPFLAGS) -S $*.c
 
 $(IC_OBJ):
 	$(CC) $(IC_INC) $(CFLAGS) $(CPPFLAGS) -c $*.c -o $*.o
 
-clean: 
+clean:
 	-rm -rf $(ALL_EXE) $(UTIL_EXE) $(TEST_EXE) *.o *.s
 	-rm -rf test_IC/*.o  test_IC/*.~
 	cd surf_view/ && $(MAKE) clean
@@ -488,5 +515,3 @@ clean:
 
 distclean: clean
 	-rm -rf *~
-
-

@@ -23,6 +23,6 @@ void set_dp_mpi_type(struct dp_mpi_param *this_dp_mpi)
   type[0]=MPI_FLOAT;
   adr[0]=0;
 
-  MPI_Type_struct(1,blockcount, adr, type, &(this_dp_mpi->ray_info_type));
+  MPI_Type_create_struct(1,blockcount, adr, type, &(this_dp_mpi->ray_info_type));
   MPI_Type_commit(&(this_dp_mpi->ray_info_type));
 }
